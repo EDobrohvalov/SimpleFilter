@@ -7,42 +7,42 @@ namespace Filtering
 
     public interface IFilter<T>
     {
-        IFilter<T> And(Func<T, bool> condition);
-        IFilter<T> Or(Func<T, bool> condition);
-        
-        IFilter<T> Not(Func<T, bool> condition);
-        
+        IFilter<T> And(Predicate<T> condition);
+        IFilter<T> Or(Predicate<T> condition);
+        IFilter<T> Not(Predicate<T> condition);
         IEnumerable<T> ApplyFor(IEnumerable<T> collection);
     }
 
     public class Filter<T> : IFilter<T>
     {
-        private Func<T, bool> _predicate = obj => true;
+        private Predicate<T> _predicate;
 
-        public IFilter<T> And(Func<T, bool> condition)
+        public IFilter<T> And(Predicate<T> condition)
         {
-            var currentPredicate = _predicate;
-            _predicate =  x => currentPredicate(x) && condition(x);
-            return this;
+            return CombinePredicates(condition, (p1, p2) => x => p1(x) && p2(x));
         }
         
-        public IFilter<T> Or(Func<T, bool> condition)
+        public IFilter<T> Or(Predicate<T> condition)
         {
-            var currentPredicate = _predicate;
-            _predicate =  x => currentPredicate(x) || condition(x);
-            return this;
+            return CombinePredicates(condition, (p1, p2) => x => p1(x) || p2(x));
         }
 
-        public IFilter<T> Not(Func<T, bool> condition)
+        public IFilter<T> Not(Predicate<T> condition)
         {
-            var currentPredicate = _predicate;
-            _predicate = x => currentPredicate(x) && !condition(x);
-            return this;
+            bool NotCondition(T x) => !condition(x);
+            return And(NotCondition);
         }
 
         public IEnumerable<T> ApplyFor(IEnumerable<T> collection)
         {
-            return collection.Where(x=>_predicate(x));
+            return _predicate == null ? collection : collection.Where(x => _predicate(x));
+        }
+
+        private IFilter<T> CombinePredicates(Predicate<T> condition, Func<Predicate<T>, Predicate<T>,Predicate<T>> combineFunc)
+        {
+            var localCopy = _predicate;
+            _predicate = _predicate == null ? condition : x => combineFunc(localCopy, condition)(x);
+            return this;
         }
     }
 }

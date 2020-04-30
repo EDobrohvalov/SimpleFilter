@@ -7,76 +7,123 @@ namespace FilteringTest
 {
     public class FilterTests
     {
-        private Filter<int> _filter;
-        private IEnumerable<int> _source;
+        private Filter<Tclass> _filter;
+        private IEnumerable<Tclass> _source;
+
+        class Tclass
+        {
+            public int A;
+            public bool B;
+            public double C;
+        }
+
 
         [SetUp]
         public void Setup()
         {
-            _filter = new Filter<int>();
+            _filter = new Filter<Tclass>();
+            _source = new[]
+            {
+                new Tclass
+                {
+                    A = 0,
+                    B = false,
+                    C = double.NaN
+                },
+                new Tclass
+                {
+                    A = -1,
+                    B = true,
+                    C = double.PositiveInfinity
+                },
+                new Tclass
+                {
+                    A = 1,
+                    B = true,
+                    C = double.NegativeInfinity
+                },
+                new Tclass
+                {
+                    A = 0,
+                    B = true,
+                    C = 0.0
+                }
+            };
         }
 
         [Test]
-        public void AndTest()
+        public void EmptyFilterNotChangeSource()
         {
-            var source = new[] {1, 2};
-            _filter.And(i => i == 1);
-
-            var result = _filter.ApplyFor(source);
-
-            Assert.AreEqual(1, result.Count());
+            var result = _filter.ApplyFor(_source);
+            CollectionAssert.AreEqual(_source, result);
         }
 
         [Test]
-        public void CombineAndTest()
+        public void AND_Test()
         {
-            var source = new[] {1, 2, 3, 4, 5, 6};
+            _filter.And(i => double.IsNaN(i.C));
+            var result = _filter.ApplyFor(_source).Count();
+            Assert.AreEqual(1, result);
+        }
+
+        [Test]
+        public void Combined_AND_Test()
+        {
             _filter
-                .And(i => i % 2 == 0)
-                .And(i => i > 3);
+                .And(i => i.A != 0)
+                .And(i=> i.B);
 
-            var result = _filter.ApplyFor(source);
+            var result = _filter.ApplyFor(_source).Count();
 
-            Assert.AreEqual(2, result.Count());
+            Assert.AreEqual(2, result);
         }
-
+        
         [Test]
-        public void OrTest()
+        public void Single_OR_WorkLike_AND()
         {
-            var source = new[] {1, 2,3,4};
-            _filter
-                .And(i => i == 1)
-                .Or(i => i == 2);
-
-            var result = _filter.ApplyFor(source);
-
-            Assert.AreEqual(2, result.Count());
-        }
-
-        [Test]
-        public void NotTest()
-        {
-            var source = new[] {1, 2, 3, 4, 5};
+            var and_filter = new Filter<Tclass>();
+            and_filter.And(x => x.A != 1);
+            _filter.Or(x => x.A != 1);
             
-            _filter.Not(x => x == 3);
-
-            var result = _filter.ApplyFor(source);
-
-            Assert.AreEqual(4, result.Count());
+            var OR_result = _filter.ApplyFor(_source).Count();
+            var AND_result = and_filter.ApplyFor(_source).Count();
+            
+            Assert.AreEqual(AND_result, OR_result);
         }
 
         [Test]
-        public void CombineOrTest()
+        public void OR_Test()
         {
-            var source = new[] {1, 2, 3, 4, 5};
             _filter
-                .And(i => i == 1)
-                .Or(i => i % 2 == 0)
-                .Or(i => i == 5);
+                .Or(x => double.IsInfinity(x.C))
+                .Or(x => double.IsNaN(x.C));
+            
+            var result = _filter.ApplyFor(_source).Count();
 
-            var result = _filter.ApplyFor(source);
-
-            Assert.AreEqual(4, result.Count());
+            Assert.AreEqual(3, result);
         }
+        
+        [Test]
+        public void Combined_OR_Test()
+        {
+            _filter
+                .Or(x => double.IsNegativeInfinity(x.C))
+                .Or(x => x.A == 0)
+                .Or(x=> !x.B);
+            
+            var result = _filter.ApplyFor(_source).Count();
+
+            Assert.AreEqual(3, result);
+        }
+
+        [Test]
+        public void NOT_Test()
+        {
+            _filter.Not(x => double.IsNaN(x.C));
+            var result = _filter.ApplyFor(_source).Count();
+            Assert.AreEqual(3, result);
+        }
+
+        
     }
 }
